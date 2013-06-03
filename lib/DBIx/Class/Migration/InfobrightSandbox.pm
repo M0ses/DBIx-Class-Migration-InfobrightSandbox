@@ -10,7 +10,7 @@ use 5.12.03;
 
 with 'DBIx::Class::Migration::Sandbox';
 
-our $VERSION=0.000001; 
+our $VERSION=0.000002; 
 
 has test_mysqld => (is=>'ro', lazy_build=>1);
 
@@ -113,13 +113,94 @@ sub _write_use {
 
   print $fh <<USE;
 #!/usr/bin/env sh
+#
+PID_FILE=`grep 'pid-file=' $base_dir/etc/my.cnf|cut -d= -f2`
+
+STOP_MYSQLD=0
+START_MYSQLD=$bin/start
+#
+#
+if [ ! -e \$PID_FILE ]
+then
+    \$START_MYSQLD
+     STOP_MYSQLD=1
+else
+    kill -0 `cat \$PID_FILE`
+    if [ \$? -gt 0 ]
+    then
+        \$START_MYSQLD
+        STOP_MYSQLD=1
+    fi
+fi
+
+if [ "\$STOP_MYSQLD" -eq 1 ]
+then 
+    sleep 3
+fi    
 
 $mysqld --socket=$SOCKET -u root test
+
+if [ "\$STOP_MYSQLD" -eq 1 ]
+then
+    /home/isarflow/IsarFlow-gerrit/Catalyst/bin/../share/sandboxes/infobright/isarflow-schema-all/bin/stop
+fi
+
 USE
 
   close($fh);
 
   chmod oct("0755"), catfile($bin, 'use');
+}
+
+sub _write_dump {
+  my $base_dir = (my $self = shift)->test_mysqld->base_dir;
+  mkpath(my $bin = catdir($base_dir, 'bin'));
+  open( my $fh, '>', catfile($bin, 'dump'))
+    || die "Cannot open $bin/dump: $!";
+
+  my $mysqld = $self->test_mysqld->{mysqld};
+  my $SOCKET = $self->test_mysqld->my_cnf->{socket};
+  $mysqld =~s/d$/dump/; ## ug. sorry :(
+
+  print $fh <<DUMP;
+#!/usr/bin/env sh
+PID_FILE=`grep 'pid-file=' $base_dir/etc/my.cnf|cut -d= -f2`
+
+STOP_MYSQLD=0
+START_MYSQLD=$bin/start
+#
+#
+if [ ! -e \$PID_FILE ]
+then
+    \$START_MYSQLD
+     STOP_MYSQLD=1
+else
+    kill -0 `cat \$PID_FILE`
+    if [ \$? -gt 0 ]
+    then
+        \$START_MYSQLD
+        STOP_MYSQLD=1
+    fi
+fi
+
+if [ "\$STOP_MYSQLD" -eq 1 ]
+then 
+    sleep 3
+fi    
+
+$mysqld --socket=$SOCKET -u root test \$@
+
+if [ "\$STOP_MYSQLD" -eq 1 ]
+then
+    /home/isarflow/IsarFlow-gerrit/Catalyst/bin/../share/sandboxes/infobright/isarflow-schema-all/bin/stop
+fi
+
+
+DUMP
+
+  close($fh);
+
+  chmod oct("0755"), catfile($bin, 'dump');
 }
 
 sub make_sandbox {
@@ -132,6 +213,7 @@ sub make_sandbox {
     $self->_write_start;
     $self->_write_stop;
     $self->_write_use;
+    $self->_write_dump;
     return $self->test_mysqld->dsn;
   } else {
     die "can't start a mysql sandbox\n$Test::mysqld::errstr\n";
