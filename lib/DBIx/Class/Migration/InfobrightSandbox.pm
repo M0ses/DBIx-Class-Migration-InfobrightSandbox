@@ -142,7 +142,7 @@ $mysqld --socket=$SOCKET -u root test
 
 if [ "\$STOP_MYSQLD" -eq 1 ]
 then
-    /home/isarflow/IsarFlow-gerrit/Catalyst/bin/../share/sandboxes/infobright/isarflow-schema-all/bin/stop
+    $bin/stop
 fi
 
 USE
@@ -192,7 +192,7 @@ $mysqld --socket=$SOCKET -u root test \$@
 
 if [ "\$STOP_MYSQLD" -eq 1 ]
 then
-    /home/isarflow/IsarFlow-gerrit/Catalyst/bin/../share/sandboxes/infobright/isarflow-schema-all/bin/stop
+    $bin/stop
 fi
 
 
